@@ -82,16 +82,39 @@ export function parsePbxproj(content: string): PbxProject {
 function parseObjects(content: string): Record<string, PbxObject> {
   const objects: Record<string, PbxObject> = {};
 
-  // Match object entries: ID = { ... };
-  const objectRegex = /([A-F0-9]{24})\s*(?:\/\*[^*]*\*\/)?\s*=\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g;
-  let match: RegExpExecArray | null;
+  // Find each object by looking for ID = { pattern and matching braces
+  const idPattern = /([A-F0-9]{24})\s*(?:\/\*[^*]*\*\/)?\s*=\s*\{/g;
+  let idMatch: RegExpExecArray | null;
 
-  while ((match = objectRegex.exec(content)) !== null) {
-    const id = match[1];
-    const objectContent = match[2];
+  while ((idMatch = idPattern.exec(content)) !== null) {
+    const id = idMatch[1];
+    const startBrace = idMatch.index + idMatch[0].length - 1;
 
-    if (id && objectContent) {
-      objects[id] = parseObjectContent(objectContent);
+    // Find matching closing brace
+    let depth = 1;
+    let pos = startBrace + 1;
+    while (pos < content.length && depth > 0) {
+      const char = content[pos];
+      if (char === '{') {
+        depth++;
+      } else if (char === '}') {
+        depth--;
+      }
+      pos++;
+    }
+
+    if (depth === 0 && id) {
+      const objectContent = content.substring(startBrace + 1, pos - 1);
+      const parsedObj = parseObjectContent(objectContent);
+
+      // Only store if this object has a valid isa, or if we haven't seen this ID before
+      // This handles the case where an ID appears multiple times (e.g., in different sections)
+      if (parsedObj.isa || !objects[id]) {
+        // If the new object has isa, use it; otherwise keep the existing one
+        if (parsedObj.isa || !objects[id]?.isa) {
+          objects[id] = parsedObj;
+        }
+      }
     }
   }
 
@@ -156,6 +179,12 @@ function parseObjectContent(content: string): PbxObject {
   const phasesMatch = content.match(/buildPhases\s*=\s*\(([^)]*)\)/);
   if (phasesMatch?.[1]) {
     obj.buildPhases = parseArray(phasesMatch[1]);
+  }
+
+  // Extract buildConfigurations array (for XCConfigurationList)
+  const configsMatch = content.match(/buildConfigurations\s*=\s*\(([^)]*)\)/);
+  if (configsMatch?.[1]) {
+    obj['buildConfigurations'] = parseArray(configsMatch[1]);
   }
 
   return obj;
