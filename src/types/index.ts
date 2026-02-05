@@ -41,7 +41,11 @@ export type IssueCategory =
   | 'metadata'
   | 'screenshots'
   | 'version'
-  | 'iap';
+  | 'iap'
+  | 'asc'
+  | 'deprecated-api'
+  | 'private-api'
+  | 'ui-ux';
 
 /**
  * Result from an analyzer
@@ -195,10 +199,12 @@ export interface PrivacyAccessedAPIType {
 export const AnalyzeInputSchema = z.object({
   projectPath: z.string().describe('Path to the .xcodeproj or .xcworkspace directory'),
   analyzers: z
-    .array(z.enum(['all', 'info-plist', 'privacy', 'entitlements', 'code']))
+    .array(z.enum(['all', 'info-plist', 'privacy', 'entitlements', 'code', 'deprecated-api', 'private-api', 'security', 'ui-ux', 'asc-metadata', 'asc-screenshots', 'asc-version', 'asc-iap']))
     .optional()
     .describe('Specific analyzers to run (default: all)'),
   targetName: z.string().optional().describe('Specific target to analyze'),
+  includeASC: z.boolean().optional().describe('Include App Store Connect validation (requires ASC credentials)'),
+  bundleId: z.string().optional().describe('Bundle ID for ASC validation (auto-detected if not provided)'),
 });
 
 export type AnalyzeInput = z.infer<typeof AnalyzeInputSchema>;
@@ -220,4 +226,6 @@ export interface AnalyzerOptions {
   targetName?: string | undefined;
   /** Base path for resolving relative paths */
   basePath: string;
+  /** Bundle ID for ASC validation (auto-detected from project if not provided) */
+  bundleId?: string | undefined;
 }

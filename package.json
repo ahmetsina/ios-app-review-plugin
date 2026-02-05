@@ -1,6 +1,6 @@
 {
   "name": "ios-app-review-plugin",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Claude Code MCP plugin to review iOS apps before App Store submission",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -55,6 +55,7 @@
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
+    "nock": "^13.5.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.2",
     "tsx": "^4.7.0",

@@ -122,7 +122,7 @@ function extractTargets(pbxProject: PbxProject, basePath: string): XcodeTarget[]
   const objects = pbxProject.objects;
 
   // Find native targets
-  for (const [_id, obj] of Object.entries(objects)) {
+  for (const obj of Object.values(objects)) {
     if (obj.isa === 'PBXNativeTarget') {
       const target = extractTarget(obj, objects, basePath);
       if (target) {
