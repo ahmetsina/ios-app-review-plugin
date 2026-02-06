@@ -1,6 +1,6 @@
 {
   "name": "ios-app-review-plugin",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "files": [
     "dist",
     "README.md",

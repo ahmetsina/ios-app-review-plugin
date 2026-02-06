@@ -189,10 +189,11 @@ describe('runCli', () => {
       }
 
       expect(mockStderr).toHaveBeenCalledWith(expect.stringContaining('invalid format'));
+      expect(mockStderr).toHaveBeenCalledWith(expect.stringContaining('pretty'));
       expect(mockExit).toHaveBeenCalledWith(2);
     });
 
-    it('should call runScan with correct default options', async () => {
+    it('should call runScan with correct default options (pretty for terminal)', async () => {
       mockRunScan.mockResolvedValueOnce(0);
 
       try {
@@ -203,7 +204,7 @@ describe('runCli', () => {
 
       expect(mockRunScan).toHaveBeenCalledWith(expect.objectContaining({
         projectPath: '/path/to/project',
-        format: 'markdown',
+        format: 'pretty',
         output: undefined,
         analyzers: undefined,
         includeAsc: false,
@@ -211,6 +212,35 @@ describe('runCli', () => {
         config: undefined,
         badge: false,
         saveHistory: false,
+      }));
+    });
+
+    it('should default to markdown when --output is provided without --format', async () => {
+      mockRunScan.mockResolvedValueOnce(0);
+
+      try {
+        await runCli(makeArgv('scan', '/path/to/project', '--output', 'report.md'));
+      } catch {
+        // expected
+      }
+
+      expect(mockRunScan).toHaveBeenCalledWith(expect.objectContaining({
+        format: 'markdown',
+        output: 'report.md',
+      }));
+    });
+
+    it('should pass --format pretty correctly', async () => {
+      mockRunScan.mockResolvedValueOnce(0);
+
+      try {
+        await runCli(makeArgv('scan', '/path/to/project', '--format', 'pretty'));
+      } catch {
+        // expected
+      }
+
+      expect(mockRunScan).toHaveBeenCalledWith(expect.objectContaining({
+        format: 'pretty',
       }));
     });
 

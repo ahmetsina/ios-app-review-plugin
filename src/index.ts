@@ -23,7 +23,7 @@ if (process.argv.length > 2) {
 const server = new Server(
   {
     name: 'ios-app-review',
-    version: '1.0.0',
+    version: '1.1.0',
   },
   {
     capabilities: {
@@ -314,7 +314,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             format: {
               type: 'string',
-              enum: ['markdown', 'html', 'json'],
+              enum: ['markdown', 'html', 'json', 'pretty'],
               description: 'Report output format (default: markdown)',
             },
             includeHistory: {
@@ -679,7 +679,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           await store.saveScan(report, report.score);
         }
 
-        const reportFormat = (format === 'html' || format === 'json') ? format : 'markdown' as const;
+        const reportFormat = (format === 'html' || format === 'json' || format === 'pretty') ? format : 'markdown' as const;
         const formatter = createFormatter(reportFormat);
         return {
           content: [

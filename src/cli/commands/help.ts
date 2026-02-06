@@ -11,7 +11,8 @@ COMMANDS:
   version         Show version number
 
 SCAN OPTIONS:
-  --format <fmt>         Output format: markdown, html, json (default: markdown)
+  --format <fmt>         Output format: pretty, markdown, html, json
+                         (default: pretty for terminal, markdown for file)
   --output <path>        Write report to file instead of stdout
   --analyzers <list>     Comma-separated analyzer names (default: all)
   --include-asc          Include App Store Connect validation

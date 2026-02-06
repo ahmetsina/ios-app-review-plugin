@@ -213,7 +213,7 @@ export const AnalyzeInputSchema = z.object({
   includeASC: z.boolean().optional().describe('Include App Store Connect validation (requires ASC credentials)'),
   bundleId: z.string().optional().describe('Bundle ID for ASC validation (auto-detected if not provided)'),
   format: z
-    .enum(['markdown', 'html', 'json'])
+    .enum(['markdown', 'html', 'json', 'pretty'])
     .optional()
     .describe('Report output format (default: markdown)'),
   saveToHistory: z.boolean().optional().describe('Save scan results to history for future comparison'),

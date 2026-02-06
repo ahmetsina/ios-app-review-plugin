@@ -6,7 +6,7 @@ export interface CliOptions {
 
 export interface ScanOptions {
   projectPath: string;
-  format: 'markdown' | 'html' | 'json';
+  format: 'markdown' | 'html' | 'json' | 'pretty';
   output?: string | undefined;
   analyzers?: string[] | undefined;
   includeAsc: boolean;

@@ -31,7 +31,7 @@ export async function runCli(argv: string[]): Promise<void> {
     parsed = parseArgs({
       args: scanArgs,
       options: {
-        format: { type: 'string', short: 'f', default: 'markdown' },
+        format: { type: 'string', short: 'f' },
         output: { type: 'string', short: 'o' },
         analyzers: { type: 'string', short: 'a' },
         'include-asc': { type: 'boolean', default: false },
@@ -59,10 +59,17 @@ export async function runCli(argv: string[]): Promise<void> {
     process.exit(2);
   }
 
-  const format = values['format'] as string;
-  if (format !== 'markdown' && format !== 'html' && format !== 'json') {
-    console.error(`Error: invalid format "${format}". Must be markdown, html, or json.`);
-    process.exit(2);
+  const userFormat = values['format'] as string | undefined;
+  let format: 'markdown' | 'html' | 'json' | 'pretty';
+  if (userFormat) {
+    if (userFormat !== 'markdown' && userFormat !== 'html' && userFormat !== 'json' && userFormat !== 'pretty') {
+      console.error(`Error: invalid format "${userFormat}". Must be pretty, markdown, html, or json.`);
+      process.exit(2);
+    }
+    format = userFormat;
+  } else {
+    // Smart default: pretty for terminal, markdown for file output
+    format = values['output'] ? 'markdown' : 'pretty';
   }
 
   const analyzersList = values['analyzers']

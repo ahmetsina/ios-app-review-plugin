@@ -1,7 +1,7 @@
 import type { AnalysisReport, Issue } from '../types/index.js';
 import type { EnrichedIssue } from '../guidelines/types.js';
 
-export type ReportFormat = 'markdown' | 'html' | 'json';
+export type ReportFormat = 'markdown' | 'html' | 'json' | 'pretty';
 
 export interface HistoricalComparison {
   previousScanId: string;
