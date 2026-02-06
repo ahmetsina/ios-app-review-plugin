@@ -1,15 +1,15 @@
 {
   "name": "ios-app-review-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Claude Code MCP plugin to review iOS apps before App Store submission",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "ios-app-review": "./dist/index.js"
+    "ios-app-review": "dist/index.js"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/index.js",
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
