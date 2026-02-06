@@ -12,6 +12,9 @@ import { DeprecatedAPIAnalyzer } from './analyzers/deprecated-api.js';
 import { PrivateAPIAnalyzer } from './analyzers/private-api.js';
 import { SecurityAnalyzer } from './analyzers/security.js';
 import { UIUXAnalyzer } from './analyzers/ui-ux.js';
+import { RuleLoader, CustomRuleEngine } from './rules/index.js';
+import { GuidelineMatcher } from './guidelines/index.js';
+import type { EnrichedAnalysisReport } from './guidelines/index.js';
 import type {
   AnalyzeInput,
   AnalysisReport,
@@ -47,7 +50,7 @@ const ASC_ANALYZERS: Record<string, () => Analyzer> = {
 /**
  * Run analysis on an iOS project
  */
-export async function runAnalysis(input: AnalyzeInput): Promise<AnalysisReport> {
+export async function runAnalysis(input: AnalyzeInput): Promise<EnrichedAnalysisReport> {
   const startTime = Date.now();
   const projectPath = path.resolve(input.projectPath);
 
@@ -85,15 +88,40 @@ export async function runAnalysis(input: AnalyzeInput): Promise<AnalysisReport> 
     }
   }
 
+  // Run custom rules if available
+  try {
+    const loader = new RuleLoader();
+    const loaded = input.customRulesPath
+      ? await loader.loadConfig(input.customRulesPath).then((config) => ({
+          config,
+          rules: loader.compileRules(config),
+        }))
+      : await loader.loadFromProject(basePath);
+
+    if (loaded) {
+      const engine = new CustomRuleEngine(loaded.config);
+      const customResult = await engine.scan(basePath, loaded.rules);
+      if (customResult.issues.length > 0) {
+        results.push(customResult);
+      }
+    }
+  } catch {
+    // Custom rules are optional; silently skip on error
+  }
+
   // Calculate summary
   const summary = calculateSummary(results, Date.now() - startTime);
 
-  return {
+  const report: AnalysisReport = {
     projectPath,
     timestamp: new Date().toISOString(),
     results,
     summary,
   };
+
+  // Enrich with guideline cross-references and score
+  const matcher = new GuidelineMatcher();
+  return matcher.enrichReport(report);
 }
 
 /**

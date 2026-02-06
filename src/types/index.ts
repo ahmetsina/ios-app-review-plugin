@@ -27,6 +27,12 @@ export interface Issue {
   suggestion?: string | undefined;
   /** Category of the issue */
   category: IssueCategory;
+  /** URL to the relevant App Store Review Guideline */
+  guidelineUrl?: string | undefined;
+  /** Excerpt from the relevant guideline */
+  guidelineExcerpt?: string | undefined;
+  /** Calculated severity score based on guideline weight */
+  severityScore?: number | undefined;
 }
 
 /**
@@ -45,7 +51,8 @@ export type IssueCategory =
   | 'asc'
   | 'deprecated-api'
   | 'private-api'
-  | 'ui-ux';
+  | 'ui-ux'
+  | 'custom';
 
 /**
  * Result from an analyzer
@@ -205,6 +212,12 @@ export const AnalyzeInputSchema = z.object({
   targetName: z.string().optional().describe('Specific target to analyze'),
   includeASC: z.boolean().optional().describe('Include App Store Connect validation (requires ASC credentials)'),
   bundleId: z.string().optional().describe('Bundle ID for ASC validation (auto-detected if not provided)'),
+  format: z
+    .enum(['markdown', 'html', 'json'])
+    .optional()
+    .describe('Report output format (default: markdown)'),
+  saveToHistory: z.boolean().optional().describe('Save scan results to history for future comparison'),
+  customRulesPath: z.string().optional().describe('Path to custom rules config file (.ios-review-rules.json)'),
 });
 
 export type AnalyzeInput = z.infer<typeof AnalyzeInputSchema>;
