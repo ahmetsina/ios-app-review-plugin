@@ -1,0 +1,106 @@
+name: 'iOS App Review'
+description: 'Scan an iOS project for App Store review issues before submission'
+author: 'ahmetsina'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  project-path:
+    description: 'Path to the iOS project (.xcodeproj or .xcworkspace directory)'
+    required: true
+  format:
+    description: 'Output format: json, markdown, or html'
+    required: false
+    default: 'json'
+  analyzers:
+    description: 'Comma-separated list of analyzers to run (default: all). Options: info-plist, privacy, entitlements, code, deprecated-api, private-api, security, ui-ux'
+    required: false
+    default: 'all'
+  config:
+    description: 'Path to custom rules config file (.ios-review-rules.json)'
+    required: false
+    default: ''
+  version:
+    description: 'Version of ios-app-review-plugin to install (default: latest)'
+    required: false
+    default: 'latest'
+
+outputs:
+  exit-code:
+    description: 'Exit code from the scan (0 = passed, 1 = issues found, 2 = error)'
+    value: ${{ steps.scan.outputs.exit-code }}
+  report-path:
+    description: 'Path to the generated report file'
+    value: ${{ steps.scan.outputs.report-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install ios-app-review-plugin
+      shell: bash
+      run: npm install -g ios-app-review-plugin@${{ inputs.version }}
+
+    - name: Run iOS App Review scan
+      id: scan
+      shell: bash
+      run: |
+        REPORT_DIR="${RUNNER_TEMP}/ios-review-report"
+        mkdir -p "$REPORT_DIR"
+
+        # Determine file extension based on format
+        case "${{ inputs.format }}" in
+          json) EXT="json" ;;
+          html) EXT="html" ;;
+          markdown) EXT="md" ;;
+          *) EXT="json" ;;
+        esac
+
+        REPORT_PATH="${REPORT_DIR}/report.${EXT}"
+
+        # Build the command
+        CMD="ios-app-review scan ${{ inputs.project-path }} --format ${{ inputs.format }} --output ${REPORT_PATH}"
+
+        # Add analyzers if not 'all'
+        if [ "${{ inputs.analyzers }}" != "all" ]; then
+          CMD="${CMD} --analyzers ${{ inputs.analyzers }}"
+        fi
+
+        # Add custom config if provided
+        if [ -n "${{ inputs.config }}" ]; then
+          CMD="${CMD} --config ${{ inputs.config }}"
+        fi
+
+        # Run the scan and capture exit code
+        set +e
+        eval "$CMD"
+        EXIT_CODE=$?
+        set -e
+
+        echo "exit-code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+        echo "report-path=${REPORT_PATH}" >> "$GITHUB_OUTPUT"
+
+        # Print summary
+        if [ "$EXIT_CODE" -eq 0 ]; then
+          echo "::notice::iOS App Review scan passed with no issues."
+        elif [ "$EXIT_CODE" -eq 1 ]; then
+          echo "::warning::iOS App Review scan found issues. See report at ${REPORT_PATH}"
+        else
+          echo "::error::iOS App Review scan failed with exit code ${EXIT_CODE}"
+        fi
+
+        exit $EXIT_CODE
+
+    - name: Upload report artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-review-report
+        path: ${{ steps.scan.outputs.report-path }}
+        retention-days: 30

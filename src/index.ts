@@ -15,10 +15,15 @@ import { HistoryStore, ScanComparator } from './history/index.js';
 import { GUIDELINES } from './guidelines/index.js';
 import { RuleLoader } from './rules/index.js';
 
+// Dual-mode: CLI if args provided, MCP server otherwise
+if (process.argv.length > 2) {
+  import('./cli/index.js').then(({ runCli }) => runCli(process.argv));
+} else {
+
 const server = new Server(
   {
     name: 'ios-app-review',
-    version: '0.4.0',
+    version: '1.0.0',
   },
   {
     capabilities: {
@@ -295,7 +300,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['bundleId'],
         },
       },
-      // Phase 4: New tools
       {
         name: 'generate_report',
         description:
@@ -611,8 +615,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      // Phase 4: New tool handlers
-
       case 'generate_report': {
         const { projectPath, format, includeHistory, saveToHistory } = args as {
           projectPath: string;
@@ -625,10 +627,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const report = await runAnalysis(input);
         const enriched: EnrichedAnalysisReport = { ...report };
 
-        const basePath = (await import('path')).dirname((await import('path')).resolve(projectPath));
+        const pathMod = await import('path');
+        const basePath = pathMod.dirname(pathMod.resolve(projectPath));
         const store = new HistoryStore(basePath);
 
-        // Historical comparison
         if (includeHistory) {
           const previousScan = await store.getLatestScan();
           if (previousScan) {
@@ -673,7 +675,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
-        // Save to history
         if (saveToHistory) {
           await store.saveScan(report, report.score);
         }
@@ -696,8 +697,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           previousScanId?: string;
         };
 
-        const resolvedPath = (await import('path')).resolve(projectPath);
-        const basePath = (await import('path')).dirname(resolvedPath);
+        const pathMod = await import('path');
+        const resolvedPath = pathMod.resolve(projectPath);
+        const basePath = pathMod.dirname(resolvedPath);
         const store = new HistoryStore(basePath);
 
         const previousScan = previousScanId
@@ -771,8 +773,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'view_scan_history': {
         const { projectPath, limit } = args as { projectPath: string; limit?: number };
 
-        const resolvedPath = (await import('path')).resolve(projectPath);
-        const basePath = (await import('path')).dirname(resolvedPath);
+        const pathMod = await import('path');
+        const resolvedPath = pathMod.resolve(projectPath);
+        const basePath = pathMod.dirname(resolvedPath);
         const store = new HistoryStore(basePath);
         const scans = await store.listScans(limit ?? 10);
 
@@ -802,9 +805,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           );
         }
 
-        // Trend analysis
         if (scans.length >= 2) {
-          const scores = scans.map((s) => s.score).reverse(); // oldest first
+          const scores = scans.map((s) => s.score).reverse();
           const first = scores[0]!;
           const last = scores[scores.length - 1]!;
           const delta = last - first;
@@ -864,8 +866,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
 
         const loader = new RuleLoader();
-        const resolvedPath = (await import('path')).resolve(projectPath);
-        const basePath = (await import('path')).dirname(resolvedPath);
+        const pathMod = await import('path');
+        const resolvedPath = pathMod.resolve(projectPath);
+        const basePath = pathMod.dirname(resolvedPath);
 
         const foundPath = configPath ?? await loader.findConfig(basePath);
 
@@ -962,9 +965,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-/**
- * Run all ASC validators for a bundle ID
- */
 async function runFullASCValidation(bundleId: string): Promise<AnalysisResult[]> {
   const { ASCMetadataAnalyzer } = await import('./analyzers/asc-metadata.js');
   const { ASCScreenshotAnalyzer } = await import('./analyzers/asc-screenshots.js');
@@ -981,9 +981,6 @@ async function runFullASCValidation(bundleId: string): Promise<AnalysisResult[]>
   return results;
 }
 
-/**
- * Calculate summary from analysis results
- */
 function calculateSummary(results: AnalysisResult[]): AnalysisSummary {
   let errors = 0;
   let warnings = 0;
@@ -1017,9 +1014,6 @@ function calculateSummary(results: AnalysisResult[]): AnalysisSummary {
   };
 }
 
-/**
- * Format a single analysis result
- */
 function formatAnalysisResult(result: AnalysisResult): string {
   const lines: string[] = [
     `# ${result.analyzer} Analysis`,
@@ -1056,9 +1050,6 @@ function formatAnalysisResult(result: AnalysisResult): string {
   return lines.join('\n');
 }
 
-/**
- * Format a full ASC validation report
- */
 function formatASCReport(
   bundleId: string,
   results: AnalysisResult[],
@@ -1108,9 +1099,6 @@ function formatASCReport(
   return lines.join('\n');
 }
 
-/**
- * Start the MCP server
- */
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
@@ -1121,3 +1109,5 @@ main().catch((error) => {
   console.error('Fatal error:', error);
   process.exit(1);
 });
+
+} // end MCP server mode

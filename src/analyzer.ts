@@ -14,7 +14,11 @@ import { SecurityAnalyzer } from './analyzers/security.js';
 import { UIUXAnalyzer } from './analyzers/ui-ux.js';
 import { RuleLoader, CustomRuleEngine } from './rules/index.js';
 import { GuidelineMatcher } from './guidelines/index.js';
+import { getChangedFiles } from './git/index.js';
+import { ProgressReporter } from './progress/index.js';
 import type { EnrichedAnalysisReport } from './guidelines/index.js';
+import type { ProgressCallback } from './progress/index.js';
+import type { FileCache } from './cache/index.js';
 import type {
   AnalyzeInput,
   AnalysisReport,
@@ -47,10 +51,18 @@ const ASC_ANALYZERS: Record<string, () => Analyzer> = {
   'asc-iap': () => new ASCIAPAnalyzer(),
 };
 
+export interface RunAnalysisOptions {
+  onProgress?: ProgressCallback;
+  cache?: FileCache;
+}
+
 /**
  * Run analysis on an iOS project
  */
-export async function runAnalysis(input: AnalyzeInput): Promise<EnrichedAnalysisReport> {
+export async function runAnalysis(
+  input: AnalyzeInput,
+  options?: RunAnalysisOptions,
+): Promise<EnrichedAnalysisReport> {
   const startTime = Date.now();
   const projectPath = path.resolve(input.projectPath);
 
@@ -71,20 +83,73 @@ export async function runAnalysis(input: AnalyzeInput): Promise<EnrichedAnalysis
     );
   }
 
-  // Run analyzers
-  const results: AnalysisResult[] = [];
+  // Resolve changed files for incremental scanning
   const basePath = path.dirname(projectPath);
+  let changedFiles: string[] | undefined;
+  if (input.changedSince) {
+    changedFiles = getChangedFiles(basePath, input.changedSince);
+    if (changedFiles.length === 0) {
+      changedFiles = undefined; // fall back to full scan
+    }
+  }
 
-  for (const name of analyzerNames) {
-    const createAnalyzer = ANALYZERS[name] ?? ASC_ANALYZERS[name];
-    if (createAnalyzer) {
+  // Setup progress reporter
+  const progress = new ProgressReporter(options?.onProgress);
+  progress.scanStart(analyzerNames.length);
+
+  // Split into core and ASC analyzers
+  const coreNames = analyzerNames.filter((n) => n in ANALYZERS);
+  const ascNames = analyzerNames.filter((n) => n in ASC_ANALYZERS);
+
+  // Run core analyzers in parallel
+  const corePromises = coreNames.map(async (name) => {
+    const createAnalyzer = ANALYZERS[name];
+    if (!createAnalyzer) return null;
+    progress.analyzerStart(name);
+    const analyzerStart = Date.now();
+    const analyzer = createAnalyzer();
+    const result = await analyzer.analyze(project, {
+      targetName: input.targetName,
+      basePath,
+      bundleId: input.bundleId,
+      changedFiles,
+    });
+    progress.analyzerComplete(name, Date.now() - analyzerStart);
+    return result;
+  });
+
+  const coreSettled = await Promise.allSettled(corePromises);
+  const results: AnalysisResult[] = [];
+
+  for (const settled of coreSettled) {
+    if (settled.status === 'fulfilled' && settled.value) {
+      results.push(settled.value);
+    }
+  }
+
+  // Run ASC analyzers in parallel
+  if (ascNames.length > 0) {
+    const ascPromises = ascNames.map(async (name) => {
+      const createAnalyzer = ASC_ANALYZERS[name];
+      if (!createAnalyzer) return null;
+      progress.analyzerStart(name);
+      const analyzerStart = Date.now();
       const analyzer = createAnalyzer();
       const result = await analyzer.analyze(project, {
         targetName: input.targetName,
         basePath,
         bundleId: input.bundleId,
+        changedFiles,
       });
-      results.push(result);
+      progress.analyzerComplete(name, Date.now() - analyzerStart);
+      return result;
+    });
+
+    const ascSettled = await Promise.allSettled(ascPromises);
+    for (const settled of ascSettled) {
+      if (settled.status === 'fulfilled' && settled.value) {
+        results.push(settled.value);
+      }
     }
   }
 
@@ -110,7 +175,10 @@ export async function runAnalysis(input: AnalyzeInput): Promise<EnrichedAnalysis
   }
 
   // Calculate summary
-  const summary = calculateSummary(results, Date.now() - startTime);
+  const totalDuration = Date.now() - startTime;
+  const summary = calculateSummary(results, totalDuration);
+
+  progress.scanComplete(totalDuration);
 
   const report: AnalysisReport = {
     projectPath,

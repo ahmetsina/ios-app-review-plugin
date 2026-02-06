@@ -1,0 +1,101 @@
+title: "iOS App Review"
+summary: "Scan an iOS project for App Store review issues before submission"
+description: |
+  Runs ios-app-review-plugin to detect common App Store rejection causes
+  including missing privacy manifests, Info.plist issues, deprecated API usage,
+  private API usage, security problems, and UI/UX compliance issues.
+
+  The step installs Node.js and ios-app-review-plugin, runs the scan against
+  your project, and exports the report path and exit code as environment variables.
+website: "https://github.com/ahmetsina/ios-app-review-plugin"
+source_code_url: "https://github.com/ahmetsina/ios-app-review-plugin"
+support_url: "https://github.com/ahmetsina/ios-app-review-plugin/issues"
+type_tags:
+  - test
+  - utility
+is_requires_admin_user: false
+is_always_run: false
+is_skippable: false
+
+toolkit:
+  bash:
+    entry_file: step.sh
+
+inputs:
+  - project_path: "$BITRISE_SOURCE_DIR"
+    opts:
+      title: "Project Path"
+      summary: "Path to the iOS project directory (.xcodeproj or .xcworkspace)"
+      description: |
+        The path to the root of the iOS project to scan. This should contain
+        the .xcodeproj or .xcworkspace file.
+      is_required: true
+      is_expand: true
+
+  - format: "json"
+    opts:
+      title: "Report Format"
+      summary: "Output format for the scan report"
+      description: "Choose the output format: json, markdown, or html."
+      is_required: false
+      is_expand: true
+      value_options:
+        - "json"
+        - "markdown"
+        - "html"
+
+  - analyzers: "all"
+    opts:
+      title: "Analyzers"
+      summary: "Comma-separated list of analyzers to run"
+      description: |
+        Specify which analyzers to run as a comma-separated list.
+        Available: info-plist, privacy, entitlements, code, deprecated-api,
+        private-api, security, ui-ux. Use "all" to run every analyzer.
+      is_required: false
+      is_expand: true
+
+  - config_path: ""
+    opts:
+      title: "Custom Rules Config"
+      summary: "Path to a custom rules configuration file (.ios-review-rules.json)"
+      description: |
+        Optional path to a .ios-review-rules.json file containing custom
+        rules and severity overrides.
+      is_required: false
+      is_expand: true
+
+  - plugin_version: "latest"
+    opts:
+      title: "Plugin Version"
+      summary: "Version of ios-app-review-plugin to install"
+      description: "Specify a version (e.g., 0.4.0) or 'latest' for the most recent release."
+      is_required: false
+      is_expand: true
+
+  - node_version: "20"
+    opts:
+      title: "Node.js Version"
+      summary: "Node.js version to install if not already available"
+      description: "The Node.js major version to use. Must be 18 or higher."
+      is_required: false
+      is_expand: true
+
+outputs:
+  - IOS_REVIEW_EXIT_CODE:
+    opts:
+      title: "Scan Exit Code"
+      summary: "Exit code from the review scan (0=passed, 1=issues found, 2=error)"
+      description: |
+        The exit code returned by the ios-app-review scan command.
+        0 means the scan passed with no blocking issues.
+        1 means issues were found.
+        2 means the scan encountered an error.
+
+  - IOS_REVIEW_REPORT_PATH:
+    opts:
+      title: "Report File Path"
+      summary: "Absolute path to the generated review report file"
+      description: |
+        The file path where the scan report was written. The file format
+        matches the 'format' input parameter.

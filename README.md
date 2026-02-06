@@ -1,52 +1,52 @@
-# iOS App Store Review Plugin for Claude Code
+# iOS App Store Review Plugin
 
-A Claude Code MCP server plugin that helps developers review their iOS apps before submitting to the App Store. It analyzes both the codebase and App Store Connect metadata to catch common rejection reasons early.
+[![CI](https://github.com/ahmetsina/ios-app-review-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmetsina/ios-app-review-plugin/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/ios-app-review-plugin)](https://www.npmjs.com/package/ios-app-review-plugin)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Overview
+Catch App Store rejection issues before you submit. Works as a **CLI tool** and a **Claude Code MCP server**.
 
-App Store rejections waste valuable time and delay releases. This plugin performs automated pre-submission checks by:
+## What It Does
 
-- **Analyzing your Xcode project** for common rejection patterns
-- **Validating App Store Connect metadata** for completeness
-- **Cross-referencing** declared capabilities with actual code usage
-- **Checking compliance** with Apple's App Store Review Guidelines
+Analyzes your Xcode project and App Store Connect metadata to flag issues that cause App Store rejections:
 
-## Features
+- **Info.plist** — missing keys, invalid privacy descriptions, deployment target issues
+- **Privacy Manifest** — iOS 17+ Required Reason API declarations
+- **Entitlements** — misconfigured capabilities, debug-only entitlements in release
+- **Code Scanner** — hardcoded secrets, debug statements, force unwraps, deprecated APIs
+- **Deprecated APIs** — UIWebView, AddressBook, and 50+ other deprecated symbols
+- **Private APIs** — detection of undocumented Apple APIs that cause rejection
+- **Security** — ATS exceptions, insecure storage, weak crypto, jailbreak detection
+- **UI/UX Compliance** — launch storyboard, orientation, accessibility, dark mode
+- **App Store Connect** — metadata completeness, screenshots, version state, IAP config
+- **Custom Rules** — define project-specific checks with regex patterns
 
-### Codebase Analysis
-- `Info.plist` validation (required keys, privacy descriptions)
-- Privacy Manifest (`PrivacyInfo.xcprivacy`) requirements (iOS 17+)
-- Deprecated API detection
-- Private API usage detection
-- Hardcoded credentials/debug flags detection
-- App Transport Security configuration review
-- Entitlements validation
+## Quick Start
 
-### App Store Connect Integration
-- App metadata completeness check
-- Screenshot and preview validation
-- Privacy policy URL verification
-- Age rating consistency
-- In-app purchase configuration review
-- Localization completeness
-
-## Installation
+### CLI
 
 ```bash
-# Clone the repository
-git clone https://github.com/ahmetsina/ios-app-review-plugin.git
+npm install -g ios-app-review-plugin
 
-# Install dependencies
-cd ios-app-review-plugin
-npm install
+# Scan a project
+ios-app-review scan ./MyApp.xcodeproj
 
-# Build the MCP server
-npm run build
+# JSON output to file
+ios-app-review scan ./MyApp.xcodeproj --format json --output report.json
+
+# Specific analyzers only
+ios-app-review scan ./MyApp.xcodeproj --analyzers code,security,privacy
+
+# Incremental scan (only changed files)
+ios-app-review scan ./MyApp.xcodeproj --changed-since main
+
+# With badge generation
+ios-app-review scan ./MyApp.xcodeproj --badge --output report.md
 ```
 
-### Configure Claude Code
+### MCP Server (Claude Code)
 
-Add to your `~/.claude/mcp_servers.json`:
+Add to `~/.claude/mcp_servers.json`:
 
 ```json
 {
@@ -62,97 +62,144 @@ Add to your `~/.claude/mcp_servers.json`:
 }
 ```
 
-## Usage
-
-Once installed, you can use the plugin in Claude Code:
-
+Then in Claude Code:
 ```
-Review my iOS app at /path/to/MyApp.xcodeproj before App Store submission
+Review my iOS app at ./MyApp.xcodeproj before submission
 ```
 
-The plugin will:
-1. Scan the Xcode project structure
-2. Analyze Info.plist and entitlements
-3. Check for common rejection patterns
-4. Connect to App Store Connect (if configured)
-5. Generate a comprehensive review report
+## CLI Reference
 
-## App Store Connect API Setup
+```
+USAGE
+  ios-app-review <command> [options]
 
-1. Go to [App Store Connect](https://appstoreconnect.apple.com/) → Users and Access → Keys
+COMMANDS
+  scan <path>    Analyze an Xcode project
+  help           Show usage information
+  version        Print version
+
+SCAN OPTIONS
+  -f, --format <type>      Output format: markdown, html, json (default: markdown)
+  -o, --output <path>      Write report to file (default: stdout)
+  -a, --analyzers <list>   Comma-separated analyzer names
+      --include-asc        Include App Store Connect validation
+      --changed-since <ref> Only scan files changed since git ref
+  -c, --config <path>      Path to custom rules file
+      --badge              Generate SVG badge alongside report
+      --save-history       Save results for historical comparison
+
+EXIT CODES
+  0  All checks passed
+  1  Issues with errors found
+  2  Invalid arguments or runtime error
+```
+
+## Analyzers
+
+| Name | Key | Description |
+|------|-----|-------------|
+| Info.plist | `info-plist` | Required keys, privacy descriptions, bundle config |
+| Privacy Manifest | `privacy` | iOS 17+ Required Reason API declarations |
+| Entitlements | `entitlements` | Capability configuration, debug entitlements |
+| Code Scanner | `code` | Secrets, debug code, force unwraps, TODOs |
+| Deprecated API | `deprecated-api` | UIWebView, AddressBook, and 50+ deprecated symbols |
+| Private API | `private-api` | Undocumented Apple API usage |
+| Security | `security` | ATS, crypto, storage, jailbreak detection |
+| UI/UX | `ui-ux` | Launch screen, orientation, accessibility |
+| ASC Metadata | `asc-metadata` | App name, description, screenshots, privacy policy |
+| ASC Screenshots | `asc-screenshots` | Screenshot counts, dimensions per device |
+| ASC Version | `asc-version` | Version state, build attachment, copyright |
+| ASC IAP | `asc-iap` | In-app purchase localization, pricing |
+
+## Custom Rules
+
+Create `.ios-review-rules.json` in your project root:
+
+```json
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "no-force-unwrap",
+      "title": "Avoid force unwrapping",
+      "description": "Force unwrapping can cause crashes",
+      "severity": "warning",
+      "pattern": "\\w+!\\.",
+      "fileTypes": [".swift"],
+      "category": "code"
+    }
+  ]
+}
+```
+
+See [Custom Rules Guide](docs/RULES.md) for full documentation.
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+- uses: ./.github/actions/ios-review
+  with:
+    project-path: ./MyApp.xcodeproj
+    format: json
+```
+
+Also available: [Fastlane](fastlane/README.md), [Bitrise](bitrise/step.yml), [Xcode Cloud](scripts/xcode-cloud-review.sh).
+
+See [CI/CD Guide](docs/CI_CD.md) for detailed setup instructions.
+
+## App Store Connect Setup
+
+1. Go to [App Store Connect](https://appstoreconnect.apple.com/) > Users and Access > Integrations > Keys
 2. Generate an API Key with "App Manager" role
 3. Download the `.p8` file
-4. Note your Key ID and Issuer ID
-5. Configure the environment variables as shown above
+4. Set environment variables: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH`
 
-## Common Rejection Reasons Checked
-
-| Category | Check |
-|----------|-------|
-| **Guideline 2.1** | App Completeness - crash detection, placeholder content |
-| **Guideline 2.3** | Accurate Metadata - description vs. functionality |
-| **Guideline 2.5.1** | IPv6 Compatibility - hardcoded IPv4 addresses |
-| **Guideline 4.2** | Minimum Functionality - app complexity |
-| **Guideline 5.1.1** | Data Collection - privacy manifest requirements |
-| **Guideline 5.1.2** | Data Use and Sharing - purpose strings |
+See [ASC Setup Tutorial](docs/tutorials/ASC_SETUP.md).
 
 ## Project Structure
 
 ```
-ios-app-review-plugin/
-├── src/
-│   ├── index.ts              # MCP server entry point
-│   ├── analyzers/
-│   │   ├── info-plist.ts     # Info.plist validation
-│   │   ├── privacy.ts        # Privacy manifest checks
-│   │   ├── entitlements.ts   # Entitlements validation
-│   │   ├── deprecated-api.ts # Deprecated API detection
-│   │   └── security.ts       # Security checks
-│   ├── asc/
-│   │   ├── client.ts         # App Store Connect API client
-│   │   ├── metadata.ts       # Metadata validation
-│   │   └── screenshots.ts    # Screenshot validation
-│   ├── parsers/
-│   │   ├── xcodeproj.ts      # Xcode project parser
-│   │   └── plist.ts          # Property list parser
-│   └── rules/
-│       └── guidelines.ts     # App Store Guidelines rules
-├── tests/
-├── docs/
-│   ├── GUIDELINES.md         # Supported guidelines
-│   └── API.md                # API documentation
-└── package.json
+src/
+  index.ts              Dual-mode entry point (CLI + MCP server)
+  analyzer.ts           Parallel analysis orchestrator
+  cli/                  CLI commands (scan, help, version)
+  analyzers/            12 analyzer implementations
+  asc/                  App Store Connect API client
+  parsers/              Xcode project + plist parsers
+  reports/              Markdown, HTML, JSON formatters
+  guidelines/           App Store Guidelines cross-reference
+  rules/                Custom rule engine
+  history/              Scan history + comparison
+  cache/                File-level caching
+  git/                  Git diff for incremental scanning
+  progress/             Progress reporting
+  badge/                SVG badge generation
 ```
 
-## Contributing
+## Documentation
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and contribution guidelines.
+- [CLI Reference](docs/CLI.md)
+- [MCP API Reference](docs/API.md)
+- [Analyzers Guide](docs/ANALYZERS.md)
+- [Custom Rules](docs/RULES.md)
+- [Report Formats](docs/REPORTS.md)
+- [CI/CD Integration](docs/CI_CD.md)
+- [Badge Generation](docs/BADGES.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Getting Started Tutorial](docs/tutorials/GETTING_STARTED.md)
+- [Security Policy](docs/SECURITY.md)
 
-## Roadmap
+## Development
 
-See the [GitHub Project](https://github.com/ahmetsina/ios-app-review-plugin/projects) for planned features and progress.
-
-### Phase 1: Codebase Analysis (MVP)
-- Info.plist validation
-- Privacy manifest requirements
-- Basic code scanning
-
-### Phase 2: App Store Connect Integration
-- API authentication
-- Metadata validation
-- Screenshot checks
-
-### Phase 3: Advanced Analysis
-- Binary analysis integration
-- Custom rule definitions
-- CI/CD integration
+```bash
+npm install
+npm run build
+npm test
+npm run benchmark
+```
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-- Apple's [App Store Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
-- [App Store Connect API](https://developer.apple.com/documentation/appstoreconnectapi) documentation
-- Claude Code and MCP specification

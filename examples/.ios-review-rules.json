@@ -1,0 +1,82 @@
+{
+  "$schema": "https://raw.githubusercontent.com/ahmetsina/ios-app-review-plugin/main/schemas/custom-rules.schema.json",
+  "$comment": "Custom rules configuration for ios-app-review-plugin. Copy this file to your project root and modify as needed.",
+
+  "version": 1,
+
+  "rules": [
+    {
+      "$comment": "Detect hardcoded API keys in Swift files.",
+      "id": "custom-no-hardcoded-api-keys",
+      "title": "Hardcoded API Key Detected",
+      "description": "API keys should not be hardcoded in source files. Use environment variables, .xcconfig files, or a secrets manager instead.",
+      "severity": "error",
+      "pattern": "(?:api[_-]?key|apiKey|API_KEY)\\s*[:=]\\s*[\"'][A-Za-z0-9_\\-]{20,}[\"']",
+      "flags": "gi",
+      "fileTypes": [".swift", ".m", ".mm", ".h"],
+      "guideline": "2.3.1 - Performance: Accurate Metadata",
+      "suggestion": "Move API keys to a .xcconfig file or use a secrets management solution.",
+      "category": "security"
+    },
+    {
+      "$comment": "Warn about force unwrapping in Swift, which can cause runtime crashes.",
+      "id": "custom-no-force-unwrap",
+      "title": "Force Unwrap Detected",
+      "description": "Force unwrapping (!) can cause runtime crashes if the value is nil. This is a common cause of App Store rejections under the Performance guideline.",
+      "severity": "warning",
+      "pattern": "\\b\\w+!\\.",
+      "flags": "g",
+      "fileTypes": [".swift"],
+      "guideline": "2.1 - Performance: App Completeness",
+      "suggestion": "Use optional binding (if let/guard let) or nil coalescing (??) instead of force unwrapping.",
+      "category": "code"
+    },
+    {
+      "$comment": "Detect TODO/FIXME comments that might indicate unfinished features.",
+      "id": "custom-unfinished-code",
+      "title": "Unfinished Code Marker Found",
+      "description": "TODO or FIXME comments may indicate unfinished functionality. Apple may reject apps with incomplete features.",
+      "severity": "info",
+      "pattern": "(?://|/\\*)\\s*(?:TODO|FIXME|HACK|XXX)\\b",
+      "flags": "gi",
+      "fileTypes": [".swift", ".m", ".mm", ".h"],
+      "guideline": "2.1 - Performance: App Completeness",
+      "suggestion": "Review and resolve all TODO/FIXME items before submitting to the App Store.",
+      "category": "code"
+    },
+    {
+      "$comment": "Detect usage of UIWebView, which Apple deprecated and no longer accepts.",
+      "id": "custom-no-uiwebview",
+      "title": "UIWebView Usage Detected",
+      "description": "UIWebView has been deprecated and Apple rejects apps that use it. Use WKWebView instead.",
+      "severity": "error",
+      "pattern": "\\bUIWebView\\b",
+      "flags": "g",
+      "fileTypes": [".swift", ".m", ".mm", ".h", ".xib", ".storyboard"],
+      "guideline": "2.5.6 - Performance: Software Requirements",
+      "suggestion": "Replace UIWebView with WKWebView from the WebKit framework.",
+      "category": "deprecated-api"
+    },
+    {
+      "$comment": "Detect print statements that should be removed from production builds.",
+      "id": "custom-no-print-statements",
+      "title": "Print Statement in Production Code",
+      "description": "Print statements can expose sensitive information in device logs and may impact performance.",
+      "severity": "warning",
+      "pattern": "\\bprint\\s*\\(",
+      "flags": "g",
+      "fileTypes": [".swift"],
+      "guideline": "2.3.1 - Performance: Accurate Metadata",
+      "suggestion": "Remove print statements or use a logging framework with appropriate log levels for production builds.",
+      "category": "code"
+    }
+  ],
+
+  "disabledRules": [
+    "custom-no-print-statements"
+  ],
+
+  "severityOverrides": {
+    "custom-unfinished-code": "warning"
+  }
+}

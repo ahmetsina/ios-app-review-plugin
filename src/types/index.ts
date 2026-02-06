@@ -218,6 +218,7 @@ export const AnalyzeInputSchema = z.object({
     .describe('Report output format (default: markdown)'),
   saveToHistory: z.boolean().optional().describe('Save scan results to history for future comparison'),
   customRulesPath: z.string().optional().describe('Path to custom rules config file (.ios-review-rules.json)'),
+  changedSince: z.string().optional().describe('Git ref to compare against for incremental scanning'),
 });
 
 export type AnalyzeInput = z.infer<typeof AnalyzeInputSchema>;
@@ -241,4 +242,6 @@ export interface AnalyzerOptions {
   basePath: string;
   /** Bundle ID for ASC validation (auto-detected from project if not provided) */
   bundleId?: string | undefined;
+  /** List of changed files for incremental scanning */
+  changedFiles?: string[] | undefined;
 }

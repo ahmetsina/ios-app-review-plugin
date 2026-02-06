@@ -1,0 +1,129 @@
+# examples/bitrise-workflow.yml
+#
+# Example Bitrise workflow that includes ios-app-review-plugin as a
+# step in the build pipeline. Add this workflow (or merge its steps)
+# into your bitrise.yml file.
+#
+# Prerequisites:
+#   - Add the ios-app-review step to your Bitrise project, or use
+#     a Script step to install and run the tool manually.
+
+format_version: "13"
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+
+app:
+  envs:
+    - BITRISE_PROJECT_PATH: MyApp.xcodeproj
+    - BITRISE_SCHEME: MyApp
+
+workflows:
+
+  # Full pipeline: build, test, then review
+  primary:
+    steps:
+      - activate-ssh-key@4: {}
+      - git-clone@8: {}
+      - certificate-and-profile-installer@1: {}
+
+      - xcode-build-for-test@3:
+          inputs:
+            - project_path: "$BITRISE_PROJECT_PATH"
+            - scheme: "$BITRISE_SCHEME"
+
+      - xcode-test@5:
+          inputs:
+            - project_path: "$BITRISE_PROJECT_PATH"
+            - scheme: "$BITRISE_SCHEME"
+
+      # Run iOS App Review scan
+      - script@1:
+          title: iOS App Review Scan
+          inputs:
+            - content: |
+                #!/usr/bin/env bash
+                set -euo pipefail
+
+                # Install Node.js if not available
+                if ! command -v node &>/dev/null; then
+                  echo "Installing Node.js..."
+                  brew install node@20
+                  brew link --overwrite node@20 2>/dev/null || true
+                fi
+
+                echo "Node.js: $(node --version)"
+
+                # Install the review tool
+                npm install -g ios-app-review-plugin
+
+                # Create output directory
+                REPORT_DIR="${BITRISE_DEPLOY_DIR}/ios-review"
+                mkdir -p "$REPORT_DIR"
+
+                # Run the scan
+                set +e
+                ios-app-review scan "$BITRISE_SOURCE_DIR" \
+                  --format json \
+                  --output "$REPORT_DIR/report.json"
+                EXIT_CODE=$?
+                set -e
+
+                # Export environment variables for subsequent steps
+                envman add --key IOS_REVIEW_EXIT_CODE --value "$EXIT_CODE"
+                envman add --key IOS_REVIEW_REPORT_PATH --value "$REPORT_DIR/report.json"
+
+                # Print summary
+                if [ -f "$REPORT_DIR/report.json" ] && command -v jq &>/dev/null; then
+                  echo ""
+                  echo "=== iOS App Review Results ==="
+                  jq '.summary' "$REPORT_DIR/report.json"
+                  echo "=============================="
+                fi
+
+                if [ "$EXIT_CODE" -eq 0 ]; then
+                  echo "iOS App Review: PASSED"
+                elif [ "$EXIT_CODE" -eq 1 ]; then
+                  echo "iOS App Review: Issues found - review the report"
+                  # Uncomment the next line to fail the build on issues:
+                  # exit 1
+                else
+                  echo "iOS App Review: Error (exit code $EXIT_CODE)"
+                  exit "$EXIT_CODE"
+                fi
+
+      - deploy-to-bitrise-io@2:
+          inputs:
+            - deploy_path: "$BITRISE_DEPLOY_DIR/ios-review"
+
+  # Standalone review-only workflow
+  review-only:
+    steps:
+      - activate-ssh-key@4: {}
+      - git-clone@8: {}
+
+      - script@1:
+          title: iOS App Review Scan
+          inputs:
+            - content: |
+                #!/usr/bin/env bash
+                set -euo pipefail
+
+                if ! command -v node &>/dev/null; then
+                  brew install node@20
+                  brew link --overwrite node@20 2>/dev/null || true
+                fi
+
+                npm install -g ios-app-review-plugin
+
+                REPORT_DIR="${BITRISE_DEPLOY_DIR}/ios-review"
+                mkdir -p "$REPORT_DIR"
+
+                ios-app-review scan "$BITRISE_SOURCE_DIR" \
+                  --format json \
+                  --output "$REPORT_DIR/report.json" \
+                  --analyzers info-plist,privacy,entitlements,security
+
+                echo "Review complete. Report: $REPORT_DIR/report.json"
+
+      - deploy-to-bitrise-io@2:
+          inputs:
+            - deploy_path: "$BITRISE_DEPLOY_DIR/ios-review"

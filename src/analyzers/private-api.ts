@@ -183,6 +183,12 @@ export class PrivateAPIAnalyzer implements Analyzer {
       sourceFiles = await this.findSourceFiles(options.basePath);
     }
 
+    // Filter to changed files for incremental scanning
+    if (options.changedFiles) {
+      const changedSet = new Set(options.changedFiles);
+      sourceFiles = sourceFiles.filter((f) => changedSet.has(f));
+    }
+
     const issues = await this.scanFiles(sourceFiles);
 
     return {

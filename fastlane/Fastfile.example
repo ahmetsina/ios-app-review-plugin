@@ -1,0 +1,114 @@
+# fastlane/Fastfile
+#
+# Example Fastlane integration for ios-app-review-plugin.
+# Copy this file to your project's fastlane/ directory and adjust as needed.
+#
+# Prerequisites:
+#   - Node.js >= 18 installed on the build machine
+#   - npm install -g ios-app-review-plugin
+#
+# Usage:
+#   fastlane ios_review
+#   fastlane ios_review project_path:./MyApp.xcodeproj
+#   fastlane ios_review analyzers:info-plist,privacy,security
+
+default_platform(:ios)
+
+platform :ios do
+
+  desc "Run iOS App Review scan to check for App Store rejection issues"
+  lane :ios_review do |options|
+    # Configuration
+    project_path = options[:project_path] || "."
+    format = options[:format] || "json"
+    output_file = options[:output] || "fastlane/review-report.json"
+    analyzers = options[:analyzers] || nil
+    config_path = options[:config] || nil
+
+    UI.header("iOS App Review Scan")
+    UI.message("Scanning project at: #{project_path}")
+
+    # Verify ios-app-review is installed
+    unless system("which ios-app-review > /dev/null 2>&1")
+      UI.message("Installing ios-app-review-plugin...")
+      sh("npm install -g ios-app-review-plugin")
+    end
+
+    # Build the command
+    cmd = "ios-app-review scan #{project_path.shellescape}"
+    cmd += " --format #{format}"
+    cmd += " --output #{output_file.shellescape}"
+    cmd += " --analyzers #{analyzers}" if analyzers
+    cmd += " --config #{config_path.shellescape}" if config_path
+
+    # Run the scan
+    UI.message("Running: #{cmd}")
+    exit_code = nil
+
+    begin
+      sh(cmd)
+      exit_code = 0
+    rescue FastlaneCore::Interface::FastlaneShellError => e
+      # ios-app-review returns exit code 1 when issues are found
+      exit_code = e.message.match(/exit status (\d+)/)[1].to_i rescue 2
+    end
+
+    # Parse the JSON report if available
+    if format == "json" && File.exist?(output_file)
+      report = JSON.parse(File.read(output_file))
+      summary = report["summary"]
+
+      UI.message("---")
+      UI.message("Scan Results:")
+      UI.message("  Total Issues: #{summary['totalIssues']}")
+      UI.message("  Errors:       #{summary['errors']}")
+      UI.message("  Warnings:     #{summary['warnings']}")
+      UI.message("  Info:         #{summary['info']}")
+      UI.message("  Status:       #{summary['passed'] ? 'PASSED' : 'FAILED'}")
+      UI.message("---")
+
+      # List errors if any
+      if summary["errors"] > 0
+        UI.important("Issues found:")
+        report["results"].each do |result|
+          result["issues"].each do |issue|
+            next unless issue["severity"] == "error"
+            file_info = issue["filePath"] ? " (#{issue['filePath']}:#{issue['lineNumber']})" : ""
+            UI.error("  [#{issue['id']}] #{issue['title']}#{file_info}")
+            UI.message("    #{issue['suggestion']}") if issue["suggestion"]
+          end
+        end
+      end
+
+      # Fail the lane if errors were found
+      unless summary["passed"]
+        UI.user_error!(
+          "iOS App Review found #{summary['errors']} error(s) and #{summary['warnings']} warning(s). " \
+          "Review the report at #{output_file} and fix issues before submitting to App Store."
+        )
+      end
+
+      UI.success("iOS App Review scan passed! No blocking issues found.")
+    else
+      # Non-JSON format or missing output - rely on exit code
+      if exit_code != 0
+        UI.user_error!("iOS App Review scan failed with exit code #{exit_code}. Check the report at #{output_file}")
+      end
+      UI.success("iOS App Review scan completed successfully.")
+    end
+  end
+
+  desc "Build and run iOS App Review before submission"
+  lane :pre_submit_review do |options|
+    # Run tests first
+    scan(scheme: options[:scheme] || ENV["SCHEME"])
+
+    # Then run App Store review checks
+    ios_review(
+      project_path: options[:project_path] || ".",
+      format: "json",
+      output: "fastlane/review-report.json"
+    )
+  end
+
+end
