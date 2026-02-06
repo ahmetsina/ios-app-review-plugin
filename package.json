@@ -1,6 +1,11 @@
 {
   "name": "ios-app-review-plugin",
-  "version": "1.0.1",
+  "version": "1.0.2",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "description": "Claude Code MCP plugin to review iOS apps before App Store submission",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
